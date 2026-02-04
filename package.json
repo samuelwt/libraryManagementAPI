@@ -1,0 +1,25 @@
+{
+  "name": "library-api-demo",
+  "version": "1.0.0",
+  "description": "Demo implementation of a Library Management API from OpenAPI specification",
+  "main": "library-api-server.js",
+  "scripts": {
+    "start": "node library-api-server.js",
+    "dev": "nodemon library-api-server.js"
+  },
+  "keywords": [
+    "api",
+    "rest",
+    "openapi",
+    "library",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.22.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

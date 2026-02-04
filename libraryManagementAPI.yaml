@@ -1,0 +1,527 @@
+openapi: 3.0.0
+info:
+  title: Library Management API
+  version: 1.0.0
+  description: A RESTful API for managing library operations
+
+servers:
+  - url: https://api.library.com/v1
+    description: Production server
+
+paths:
+  # =============================================================================
+  # BOOKS COLLECTION ENDPOINT
+  # =============================================================================
+  /books:
+    get:
+      summary: List all books
+      description: |
+        Retrieves a paginated list of books. Supports filtering by category,
+        author, and availability. Results can be sorted by title or publication year.
+      
+      tags:
+        - Books
+      
+      parameters:
+        # QUERY PARAMETER: category
+        # Purpose: Filter books by category (e.g., "fiction", "science")
+        # Type: String, optional
+        # Example: /books?category=fiction
+        - name: category
+          in: query
+          description: Filter by book category
+          required: false
+          schema:
+            type: string
+            example: fiction
+        
+        # QUERY PARAMETER: author
+        # Purpose: Filter books by author name
+        # Type: String, optional
+        # Example: /books?author=Tolkien
+        - name: author
+          in: query
+          description: Filter by author name
+          required: false
+          schema:
+            type: string
+            example: Tolkien
+        
+        # QUERY PARAMETER: available
+        # Purpose: Filter by availability status
+        # Type: Boolean, optional
+        # Example: /books?available=true (only show books in stock)
+        - name: available
+          in: query
+          description: Filter by availability (true = in stock)
+          required: false
+          schema:
+            type: boolean
+            example: true
+        
+        # QUERY PARAMETER: sort_by
+        # Purpose: Specify field to sort results by
+        # Type: String, optional, enum of allowed values
+        # Example: /books?sort_by=title
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [title, published_year, author]
+            default: title
+        
+        # QUERY PARAMETER: order
+        # Purpose: Sort direction (ascending or descending)
+        # Type: String, optional
+        # Example: /books?sort_by=published_year&order=desc
+        - name: order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        
+        # PAGINATION: page
+        # Purpose: Which page of results to return
+        # Type: Integer, optional, minimum value 1
+        # Example: /books?page=2
+        - name: page
+          in: query
+          description: Page number (starts at 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        
+        # PAGINATION: limit
+        # Purpose: How many results per page
+        # Type: Integer, optional, range 1-100
+        # Example: /books?page=2&limit=20
+        - name: limit
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      
+      responses:
+        # SUCCESS RESPONSE: 200 OK
+        # When: Request successful, books found (or empty array if none)
+        # Body: JSON with books array and pagination metadata
+        '200':
+          description: Successful response with books list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  # DATA: Array of book objects
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  
+                  # METADATA: Pagination information
+                  pagination:
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                        example: 1
+                      total_pages:
+                        type: integer
+                        example: 5
+                      total_items:
+                        type: integer
+                        example: 94
+                      items_per_page:
+                        type: integer
+                        example: 20
+              
+              # EXAMPLE RESPONSE
+              example:
+                data:
+                  - id: 1
+                    title: "The Hobbit"
+                    author: "J.R.R. Tolkien"
+                    isbn: "978-0547928227"
+                    published_year: 1937
+                    category: "fiction"
+                    copies_available: 3
+                    copies_total: 5
+                  - id: 2
+                    title: "Clean Code"
+                    author: "Robert C. Martin"
+                    isbn: "978-0132350884"
+                    published_year: 2008
+                    category: "technology"
+                    copies_available: 2
+                    copies_total: 2
+                pagination:
+                  current_page: 1
+                  total_pages: 5
+                  total_items: 94
+                  items_per_page: 20
+        
+        # ERROR RESPONSE: 400 Bad Request
+        # When: Invalid query parameters (e.g., page=0, invalid sort field)
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "INVALID_PARAMETER"
+                  message: "Invalid sort_by parameter"
+                  details:
+                    - field: "sort_by"
+                      message: "Must be one of: title, published_year, author"
+    
+    # POST - CREATE NEW BOOK
+    post:
+      summary: Create a new book
+      description: |
+        Adds a new book to the library catalog. ISBN must be unique.
+        Returns the created book with its assigned ID.
+      
+      tags:
+        - Books
+      
+      # REQUEST BODY: Book data (without ID - server generates it)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - author
+                - isbn
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  example: "Design Patterns"
+                author:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "Gang of Four"
+                isbn:
+                  type: string
+                  pattern: '^[0-9-]{10,17}$'
+                  example: "978-0201633610"
+                published_year:
+                  type: integer
+                  minimum: 1000
+                  maximum: 2100
+                  example: 1994
+                category:
+                  type: string
+                  example: "technology"
+                copies_total:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                  example: 3
+      
+      responses:
+        # SUCCESS: 201 Created
+        # When: Book successfully created
+        # Headers: Location header with URL to new resource
+        # Body: Complete book object including server-generated ID
+        '201':
+          description: Book created successfully
+          headers:
+            Location:
+              description: URL of the created book
+              schema:
+                type: string
+                example: /api/v1/books/123
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+              example:
+                id: 123
+                title: "Design Patterns"
+                author: "Gang of Four"
+                isbn: "978-0201633610"
+                published_year: 1994
+                category: "technology"
+                copies_available: 3
+                copies_total: 3
+                created_at: "2026-01-08T10:30:00Z"
+                updated_at: "2026-01-08T10:30:00Z"
+        
+        # ERROR: 400 Bad Request
+        # When: Validation fails (missing fields, invalid format)
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "Invalid request data"
+                  details:
+                    - field: "isbn"
+                      message: "ISBN format is invalid"
+                    - field: "published_year"
+                      message: "Must be between 1000 and 2100"
+        
+        # ERROR: 409 Conflict
+        # When: ISBN already exists in database
+        '409':
+          description: ISBN already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "DUPLICATE_ISBN"
+                  message: "A book with this ISBN already exists"
+                  details:
+                    existing_book_id: 45
+
+  # =============================================================================
+  # SINGLE BOOK ENDPOINT
+  # =============================================================================
+  /books/{id}:
+    # PATH PARAMETER: id
+    # Purpose: Identifies which specific book to operate on
+    # Type: Integer
+    # Example: /books/123
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Unique book identifier
+        schema:
+          type: integer
+          example: 123
+    
+    # GET - RETRIEVE SINGLE BOOK
+    get:
+      summary: Get a specific book
+      description: Retrieves detailed information about a single book by its ID
+      tags:
+        - Books
+      
+      responses:
+        # SUCCESS: 200 OK
+        '200':
+          description: Book found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+              example:
+                id: 123
+                title: "The Hobbit"
+                author: "J.R.R. Tolkien"
+                isbn: "978-0547928227"
+                published_year: 1937
+                category: "fiction"
+                copies_available: 3
+                copies_total: 5
+                created_at: "2025-01-01T00:00:00Z"
+                updated_at: "2025-01-05T10:30:00Z"
+        
+        # ERROR: 404 Not Found
+        # When: Book ID doesn't exist
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "RESOURCE_NOT_FOUND"
+                  message: "Book with ID 123 not found"
+    
+    # PUT - UPDATE ENTIRE BOOK
+    put:
+      summary: Update a book
+      description: |
+        Replaces all fields of an existing book. All required fields must be provided.
+        This is a full replacement - any omitted optional fields will be set to null.
+      tags:
+        - Books
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - author
+                - isbn
+              properties:
+                title:
+                  type: string
+                author:
+                  type: string
+                isbn:
+                  type: string
+                published_year:
+                  type: integer
+                category:
+                  type: string
+                copies_total:
+                  type: integer
+      
+      responses:
+        # SUCCESS: 200 OK
+        '200':
+          description: Book updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    # DELETE - REMOVE BOOK
+    delete:
+      summary: Delete a book
+      description: |
+        Removes a book from the catalog. This operation cannot be undone.
+        Books with active loans cannot be deleted (will return 409 Conflict).
+      tags:
+        - Books
+      
+      responses:
+        # SUCCESS: 204 No Content
+        # When: Book successfully deleted
+        # Body: Empty (no content)
+        '204':
+          description: Book deleted successfully
+        
+        # ERROR: 404 Not Found
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        
+        # ERROR: 409 Conflict
+        # When: Book has active loans
+        '409':
+          description: Cannot delete book with active loans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: "RESOURCE_IN_USE"
+                  message: "Cannot delete book with active loans"
+                  details:
+                    active_loans: 2
+
+# =============================================================================
+# REUSABLE COMPONENTS
+# =============================================================================
+components:
+  schemas:
+    # BOOK SCHEMA
+    # Represents the complete structure of a book resource
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier (server-generated)
+          example: 123
+        title:
+          type: string
+          description: Book title
+          example: "The Hobbit"
+        author:
+          type: string
+          description: Author name
+          example: "J.R.R. Tolkien"
+        isbn:
+          type: string
+          description: International Standard Book Number
+          example: "978-0547928227"
+        published_year:
+          type: integer
+          description: Year of publication
+          example: 1937
+        category:
+          type: string
+          description: Book category/genre
+          example: "fiction"
+        copies_available:
+          type: integer
+          description: Number of copies currently available
+          example: 3
+        copies_total:
+          type: integer
+          description: Total number of copies owned
+          example: 5
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when book was added to catalog
+          example: "2025-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp of last update
+          example: "2025-01-05T10:30:00Z"
+    
+    # ERROR SCHEMA
+    # Standard error response format used across all endpoints
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Invalid request data"
+            details:
+              type: array
+              description: Additional error details (optional)
+              items:
+                type: object

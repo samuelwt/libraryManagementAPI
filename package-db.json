@@ -1,0 +1,22 @@
+{
+  "name": "library-api-with-database",
+  "version": "2.0.0",
+  "description": "Library Management API with SQLite database",
+  "main": "library-api-server-with-db.js",
+  "scripts": {
+    "start": "node library-api-server-with-db.js",
+    "start:old": "node library-api-server.js",
+    "dev": "nodemon library-api-server-with-db.js"
+  },
+  "keywords": ["api", "rest", "sqlite", "database", "library", "express"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
